@@ -1,6 +1,7 @@
 // controllers/masterDashboardController.js
 
 const { Product, Category } = require('../models/masterDashboardModel');
+const {manufacturerName} =require("../models/Manufacturer")
 
 // 📊 Get Total Products
 exports.getTotalProducts = async (req, res) => {
@@ -15,7 +16,7 @@ exports.getTotalProducts = async (req, res) => {
 // 📊 Get Total Companies
 exports.getTotalManufacturers = async (req, res) => {
   try {
-    const totalManufacturers = await Manufacturer.countDocuments();
+    const totalManufacturers = await manufacturerName.countDocuments();
     res.json({ totalManufacturers });
   } catch (error) {
     res.status(500).json({ message: "Error fetching manufacturers count", error: error.message });

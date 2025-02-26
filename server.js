@@ -149,7 +149,7 @@ const shipmentRoutes = require("./src/routes/shipmentRoutes");
 
 // Import models
 const Product = require("./src/models/Product");
-const Company = require("./src/models/Company");
+const manufacturerName = require("./src/models/Manufacturer");
 
 // Load environment variables
 dotenv.config();
@@ -222,9 +222,9 @@ app.get("/api/total-products", async (req, res) => {
   }
 });
 
-app.get("/api/total-companies", async (req, res) => {
-  try {
-    const totalCompanies = await Company.estimatedDocumentCount();
+app.get("/api/total-manufactures", async (req, res) => {
+  try {  
+    const totalCompanies = await manufacturerName.estimatedDocumentCount();
     res.status(200).json({ success: true, totalCompanies });
   } catch (error) {
     console.error("❌ Error fetching company count:", error.message);
