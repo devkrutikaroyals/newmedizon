@@ -177,6 +177,9 @@ const authLimiter = rateLimit({
   message: "Too many login attempts, please try again later.",
 });
 
+ app.get("/" , (res , req) =>{
+   res.send("server start")
+ })
 app.use("/api/", apiLimiter);
 app.use("/api/auth/login", authLimiter);
 
