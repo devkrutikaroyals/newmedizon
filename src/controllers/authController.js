@@ -308,29 +308,4 @@ exports.updatePassword = async (req, res) => {
   }
 };
 
-// Decline Manufacturer
-// Decline Manufacturer by updating status
-exports.declineManufacturer = async (req, res) => {
-  try {
-    const { email } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ message: "Email is required." });
-    }
-
-    const manufacturer = await Manufacturer.findOne({ email });
-
-    if (!manufacturer) {
-      return res.status(404).json({ message: "Manufacturer not found." });
-    }
-
-    manufacturer.isAuthorized = false;
-    manufacturer.status = "declined"; // Optional field to track status
-    await manufacturer.save();
-
-    res.status(200).json({ message: "Manufacturer declined successfully." });
-  } catch (error) {
-    console.error("🔥 Decline Error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
