@@ -60,7 +60,7 @@ exports.getDashboardStats = async (req, res) => {
         const totalManufacturers = await Manufacturer.countDocuments();
 
         // Count other statistics
-        const manufacturerId = req.user?.id;
+        const manufacturerId = req.manufacturer.id;
         if (!manufacturerId || !mongoose.Types.ObjectId.isValid(manufacturerId)) {
             return res.status(400).json({ message: "Invalid or missing Manufacturer ID." });
         }
@@ -72,7 +72,7 @@ exports.getDashboardStats = async (req, res) => {
         ]);
 
         res.status(200).json({
-            totalManufacturers, // Corrected this line
+             // Corrected this line
             totalProducts,
             totalOrders,
             totalShipments,
