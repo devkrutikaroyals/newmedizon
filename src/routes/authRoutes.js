@@ -23,7 +23,8 @@ const {
   loginUser,
   authorizeManufacturer,
   fetchPendingManufacturers,
-  updatePassword, // Import the new function
+  updatePassword,
+  declineManufacturer, // Import the new function
 } = require("../controllers/authController");
 
 const router = express.Router();
@@ -42,5 +43,7 @@ router.get("/pending-manufacturers", fetchPendingManufacturers);
 
 // Route to update password
 router.put("/update-password", updatePassword); // Add the new route
+
+router.post("/decline-manufacturer", declineManufacturer);
 
 module.exports = router;
