@@ -151,15 +151,12 @@ router.get("/all",  async (req, res) => {
 // Get Manufacturer's Products
 router.get("/manufacturer", authenticate, async (req, res) => {
   try {
+    // Optionally, you could also enforce that only non-master users call this endpoint
     if (req.user.role === "master") {
       return res.status(403).json({ message: "Master admin should use the master endpoint" });
     }
-
-    const totalProducts = await Product.countDocuments({ manufacturer: req.user.id });
-
     const products = await Product.find({ manufacturer: req.user.id });
-
-    res.json({ totalProducts, products });
+    res.json(products);
   } catch (error) {
     console.error("Error fetching manufacturer products:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
