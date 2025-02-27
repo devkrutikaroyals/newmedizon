@@ -24,8 +24,7 @@ const {
   authorizeManufacturer,
   fetchPendingManufacturers,
   updatePassword,
-
-  
+  declineManufacturer, // Add the new function
 } = require("../controllers/authController");
 
 const router = express.Router();
@@ -43,8 +42,9 @@ router.post("/authorize", authorizeManufacturer);
 router.get("/pending-manufacturers", fetchPendingManufacturers);
 
 // Route to update password
-router.put("/update-password", updatePassword); // Add the new route
+router.put("/update-password", updatePassword);
 
+// Route to decline manufacturer
+router.post("/decline-manufacturer", declineManufacturer); // Add the new route
 
-
-module.exports = router;
+module.exports = router;

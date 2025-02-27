@@ -308,4 +308,27 @@ exports.updatePassword = async (req, res) => {
   }
 };
 
+// Decline Manufacturer
+exports.declineManufacturer = async (req, res) => {
+  try {
+    const { email } = req.body;
 
+    if (!email) {
+      return res.status(400).json({ message: "Email is required." });
+    }
+
+    const manufacturer = await Manufacturer.findOne({ email });
+
+    if (!manufacturer) {
+      return res.status(404).json({ message: "Manufacturer not found." });
+    }
+
+    // Delete the manufacturer from the database
+    await Manufacturer.findOneAndDelete({ email });
+
+    res.status(200).json({ message: "Manufacturer declined and removed successfully." });
+  } catch (error) {
+    console.error("🔥 Decline Error:", error);
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+}; 
