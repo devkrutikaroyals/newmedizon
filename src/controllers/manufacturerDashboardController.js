@@ -82,7 +82,6 @@ const mongoose = require("mongoose");
 //         res.status(500).json({ message: "Failed to fetch dashboard data." });
 //     }
 // };
-
 exports.getDashboardStats = async (req, res) => {
     try {
         // Ensure manufacturerId is valid
@@ -100,3 +99,4 @@ exports.getDashboardStats = async (req, res) => {
         res.status(500).json({ message: "Failed to fetch total products." });
     }
 };
+
