@@ -51,17 +51,49 @@
 
 
 
+// const express = require("express");
+// const {
+//   register,
+//   loginUser,
+//   authorizeManufacturer,
+//   fetchPendingManufacturers,
+//   updatePassword,
+//   declineManufacturer, // Add the new function
+// } = require("../controllers/authController");
+
+// const router = express.Router();
+
+// // Route to register user
+// router.post("/register", register);
+
+// // Route to login user
+// router.post("/login", loginUser);
+
+// // Route to authorize manufacturer (admin only)
+// router.post("/authorize", authorizeManufacturer);
+
+// // Route to fetch pending manufacturers
+// router.get("/pending-manufacturers", fetchPendingManufacturers);
+
+// // Route to update password
+// router.put("/update-password", updatePassword);
+
+// // Route to decline manufacturer
+// router.post("/decline-manufacturer", declineManufacturer); // Add the new route
+
+// module.exports = router;
 const express = require("express");
+const router = express.Router();
+
 const {
   register,
   loginUser,
-  authorizeManufacturer,
+  approveManufacturer,
   fetchPendingManufacturers,
   updatePassword,
-  declineManufacturer, // Add the new function
+  declineManufacturer,
+  authorizeManufacturer, // ✅ Ensure this function exists in authController.js
 } = require("../controllers/authController");
-
-const router = express.Router();
 
 // Route to register user
 router.post("/register", register);
@@ -70,7 +102,7 @@ router.post("/register", register);
 router.post("/login", loginUser);
 
 // Route to authorize manufacturer (admin only)
-router.post("/authorize", authorizeManufacturer);
+router.post("/authorize", authorizeManufacturer); // 🔴 If this is undefined, remove it!
 
 // Route to fetch pending manufacturers
 router.get("/pending-manufacturers", fetchPendingManufacturers);
@@ -79,6 +111,9 @@ router.get("/pending-manufacturers", fetchPendingManufacturers);
 router.put("/update-password", updatePassword);
 
 // Route to decline manufacturer
-router.post("/decline-manufacturer", declineManufacturer); // Add the new route
+router.post("/decline-manufacturer", declineManufacturer);
 
-module.exports = router;
+// Route to approve manufacturer (via email link)
+router.get("/approve-manufacturer", approveManufacturer);
+
+module.exports = router;
