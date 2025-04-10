@@ -192,7 +192,17 @@ router.post("/", authenticate, upload.single("imageFile"), async (req, res) => {
       imageUrl = result.secure_url;
     }
 
-    // Build product data
+    // // Build product data
+    // const productData = {
+    //   name: req.body.name,
+    //   description: req.body.description,
+    //   price: req.body.price,
+    //   category: req.body.category,
+    //   stock: req.body.stock,
+    //   imageUrl: imageUrl,
+    // };
+
+
     const productData = {
       name: req.body.name,
       description: req.body.description,
@@ -200,8 +210,10 @@ router.post("/", authenticate, upload.single("imageFile"), async (req, res) => {
       category: req.body.category,
       stock: req.body.stock,
       imageUrl: imageUrl,
+      location: req.body.location, // ✅ location field add केलंय इथे
     };
 
+    
     // For manufacturers, bind the product to their account.
     if (req.user.role !== "master") {
       productData.manufacturer = req.user.id;
