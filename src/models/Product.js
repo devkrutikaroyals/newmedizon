@@ -24,6 +24,10 @@ const productSchema = new mongoose.Schema({
   category: String,
   stock: { type: Number, required: true },
   imageUrl: String,
+  videoUrl: String, // ✅ New
+  company: String,  // ✅ New
+  size: String,     // ✅ New
+  
   manufacturer: { 
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
