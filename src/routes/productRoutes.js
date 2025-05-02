@@ -172,10 +172,25 @@ router.delete("/:id", authenticate, async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 });
-// Update your stock update route in products.js
 router.put('/update-stock/:productId', authenticate, async (req, res) => {
   try {
-    const { quantity } = req.body;
+    // Validate product ID
+    if (!mongoose.Types.ObjectId.isValid(req.params.productId)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid product ID format' 
+      });
+    }
+
+    // Validate quantity
+    const quantity = Number(req.body.quantity);
+    if (isNaN(quantity)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Quantity must be a number' 
+      });
+    }
+
     const product = await Product.findById(req.params.productId);
 
     if (!product) {
@@ -189,7 +204,7 @@ router.put('/update-stock/:productId', authenticate, async (req, res) => {
     if (product.stock + quantity < 0) {
       return res.status(400).json({ 
         success: false,
-        message: 'Insufficient stock available' 
+        message: `Insufficient stock. Only ${product.stock} available` 
       });
     }
 
@@ -213,7 +228,6 @@ router.put('/update-stock/:productId', authenticate, async (req, res) => {
     });
   }
 });
-
 module.exports = router;
 
  
