@@ -4,28 +4,62 @@ const Order = require('../models/Order');
 // Place Order
 exports.placeOrder = async (req, res) => {
   try {
-    const { productId, quantity } = req.body;
+    const { product, quantity, manufacturer } = req.body;
 
-    const product = await Product.findById(productId);
-    if (!product || product.stock < quantity) {
-      return res.status(400).json({ msg: 'Insufficient stock' });
+    // Validate input
+    if (!product || !quantity || !manufacturer) {
+      return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Create Order
-    const newOrder = new Order({
-      product: productId,
+    // Check product availability
+    const productDoc = await Product.findById(product);
+    if (!productDoc) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    if (productDoc.stock < quantity) {
+      return res.status(400).json({ 
+        message: `Insufficient stock. Only ${productDoc.stock} available`
+      });
+    }
+
+    // Create order
+    const order = new Order({
+      product,
       quantity,
-      status: 'confirmed',
+      manufacturer,
+      status: 'Confirmed'
     });
-    await newOrder.save();
 
-    // Update Stock
-    product.stock -= quantity;
-    await product.save();
+    // Update product stock (using transaction for safety)
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    res.status(201).json({ msg: 'Order placed', order: newOrder });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    try {
+      await order.save({ session });
+      
+      productDoc.stock -= quantity;
+      await productDoc.save({ session });
+      
+      await session.commitTransaction();
+      
+      res.status(201).json({
+        message: 'Order placed successfully',
+        order
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+
+  } catch (error) {
+    console.error('Error placing order:', error);
+    res.status(500).json({ 
+      message: 'Failed to place order',
+      error: error.message 
+    });
   }
 };
 
@@ -34,22 +68,56 @@ exports.cancelOrder = async (req, res) => {
   try {
     const { orderId } = req.body;
 
+    // Find the order
     const order = await Order.findById(orderId);
-    if (!order || order.status === 'cancelled') {
-      return res.status(400).json({ msg: 'Order not found or already cancelled' });
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Update stock
-    const product = await Product.findById(order.product);
-    product.stock += order.quantity;
-    await product.save();
+    // Check if already cancelled
+    if (order.status === 'Cancelled') {
+      return res.status(400).json({ message: 'Order already cancelled' });
+    }
 
-    // Update order status
-    order.status = 'cancelled';
-    await order.save();
+    // Check if order can be cancelled (only Pending or Confirmed)
+    if (!['Pending', 'Confirmed'].includes(order.status)) {
+      return res.status(400).json({ 
+        message: 'Order cannot be cancelled at this stage' 
+      });
+    }
 
-    res.status(200).json({ msg: 'Order cancelled and stock restored' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Update order and restore stock (using transaction)
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Restore product stock
+      const product = await Product.findById(order.product).session(session);
+      product.stock += order.quantity;
+      await product.save();
+
+      // Update order status
+      order.status = 'Cancelled';
+      await order.save({ session });
+
+      await session.commitTransaction();
+
+      res.status(200).json({
+        message: 'Order cancelled successfully',
+        order
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    res.status(500).json({ 
+      message: 'Failed to cancel order',
+      error: error.message 
+    });
   }
 };

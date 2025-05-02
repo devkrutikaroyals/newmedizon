@@ -172,43 +172,22 @@ router.delete("/:id", authenticate, async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 });
-
-// In your Node.js backend (e.g., in your products route)
-router.put('/update-stock/:productId', async (req, res) => {
+// In your backend routes
+router.put('/products/update-stock/:id', authenticate, async (req, res) => {
   try {
-    const { quantity } = req.body;
-    const product = await Product.findById(req.params.productId);
-    
+    const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
-    
-    product.stock -= quantity;
+
+    product.stock += req.body.quantity; // Can be positive or negative
     await product.save();
-    
-    res.json({ message: 'Stock updated successfully', product });
+
+    res.json(product);
   } catch (error) {
-    res.status(500).json({ message: 'Error updating stock', error });
+    res.status(500).json({ message: 'Error updating stock', error: error.message });
   }
 });
-router.put('/update-stock/:id', async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    
-    const newStock = product.stock + req.body.quantity;
-    if (newStock < 0) return res.status(400).json({ message: 'Insufficient stock' });
-    
-    product.stock = newStock;
-    await product.save();
-    
-    res.json({ message: 'Stock updated successfully', product });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-
 
 module.exports = router;
 
