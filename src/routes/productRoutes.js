@@ -173,19 +173,38 @@ router.delete("/:id", authenticate, async (req, res) => {
   }
 });
 // In your backend routes
-router.put('/products/update-stock/:id', authenticate, async (req, res) => {
+// In your Node.js backend (productRoutes.js)
+router.put('/update-stock/:productId', async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const { quantity } = req.body;
+    const product = await Product.findById(req.params.productId);
+    
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
-
-    product.stock += req.body.quantity; // Can be positive or negative
+    
+    // Ensure stock doesn't go negative
+    if (product.stock + quantity < 0) {
+      return res.status(400).json({ 
+        message: 'Insufficient stock available' 
+      });
+    }
+    
+    product.stock += quantity; // + for increase, - for decrease
     await product.save();
-
-    res.json(product);
+    
+    res.json({ 
+      success: true,
+      message: 'Stock updated successfully',
+      newStock: product.stock
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error updating stock', error: error.message });
+    console.error('Stock update error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error updating stock',
+      error: error.message 
+    });
   }
 });
 
