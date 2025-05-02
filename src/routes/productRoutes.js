@@ -172,8 +172,7 @@ router.delete("/:id", authenticate, async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 });
-// In your backend routes
-// In your Node.js backend (productRoutes.js)
+
 router.put('/update-stock/:productId', async (req, res) => {
   try {
     const { quantity } = req.body;
