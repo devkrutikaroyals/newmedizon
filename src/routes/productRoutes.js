@@ -177,35 +177,43 @@ router.put('/update-stock/:productId', async (req, res) => {
   try {
     const { quantity } = req.body;
     const product = await Product.findById(req.params.productId);
-    
+
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Product not found' 
+      });
     }
-    
-    // Ensure stock doesn't go negative
+
+    // Prevent negative stock
     if (product.stock + quantity < 0) {
       return res.status(400).json({ 
+        success: false,
         message: 'Insufficient stock available' 
       });
     }
-    
-    product.stock += quantity; // + for increase, - for decrease
+
+    product.stock += quantity;
     await product.save();
-    
-    res.json({ 
+
+    return res.json({
       success: true,
       message: 'Stock updated successfully',
-      newStock: product.stock
+      newStock: product.stock,
+      updatedProduct: product
     });
+    
   } catch (error) {
     console.error('Stock update error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false,
       message: 'Error updating stock',
       error: error.message 
     });
   }
 });
+
+
 
 module.exports = router;
 
