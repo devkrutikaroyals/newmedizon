@@ -172,8 +172,8 @@ router.delete("/:id", authenticate, async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 });
-
-router.put('/update-stock/:productId', async (req, res) => {
+// Update your stock update route in products.js
+router.put('/update-stock/:productId', authenticate, async (req, res) => {
   try {
     const { quantity } = req.body;
     const product = await Product.findById(req.params.productId);
@@ -193,6 +193,7 @@ router.put('/update-stock/:productId', async (req, res) => {
       });
     }
 
+    // Update stock
     product.stock += quantity;
     await product.save();
 
@@ -212,8 +213,6 @@ router.put('/update-stock/:productId', async (req, res) => {
     });
   }
 });
-
-
 
 module.exports = router;
 
