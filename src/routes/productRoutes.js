@@ -5,6 +5,8 @@ const multer = require("multer");
 const Product = require("../models/Product");
 const authenticate = require("../middleware/authMiddleware");
 const cloudinary = require("cloudinary").v2;
+const mongoose = require('mongoose');
+
 require("dotenv").config();
 
 
@@ -172,10 +174,19 @@ router.delete("/:id", authenticate, async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 });
-router.put('/update-stock/:productId', authenticate, async (req, res) => {
+
+
+router.put('/update-stock/:productId', authenticate, async (req, res) => 
+  {
+    console.log('Update stock request:', {
+      productId: req.params.productId,
+      quantity: req.body.quantity,
+      user: req.user.id
+    });
+    
   try {
     // Validate product ID
-    if (!mongoose.Types.ObjectId.isValid(req.params.productId)) {
+    if (!mongoose.Types.ObjectId.isValid(req.params.productId))  {
       return res.status(400).json({ 
         success: false,
         message: 'Invalid product ID format' 
