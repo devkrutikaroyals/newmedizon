@@ -176,24 +176,16 @@ router.delete("/:id", authenticate, async (req, res) => {
 });
 
 
-router.put('/update-stock/:productId', authenticate, async (req, res) => 
-  {
-    console.log('Update stock request:', {
-      productId: req.params.productId,
-      quantity: req.body.quantity,
-      user: req.user.id
-    });
-    
+
+router.put('/update-stock/:productId', authenticate, async (req, res) => {
   try {
-    // Validate product ID
-    if (!mongoose.Types.ObjectId.isValid(req.params.productId))  {
+    if (!mongoose.Types.ObjectId.isValid(req.params.productId)) {
       return res.status(400).json({ 
         success: false,
         message: 'Invalid product ID format' 
       });
     }
 
-    // Validate quantity
     const quantity = Number(req.body.quantity);
     if (isNaN(quantity)) {
       return res.status(400).json({ 
@@ -203,7 +195,6 @@ router.put('/update-stock/:productId', authenticate, async (req, res) =>
     }
 
     const product = await Product.findById(req.params.productId);
-
     if (!product) {
       return res.status(404).json({ 
         success: false,
@@ -211,7 +202,6 @@ router.put('/update-stock/:productId', authenticate, async (req, res) =>
       });
     }
 
-    // Prevent negative stock
     if (product.stock + quantity < 0) {
       return res.status(400).json({ 
         success: false,
@@ -219,7 +209,6 @@ router.put('/update-stock/:productId', authenticate, async (req, res) =>
       });
     }
 
-    // Update stock
     product.stock += quantity;
     await product.save();
 
@@ -229,7 +218,7 @@ router.put('/update-stock/:productId', authenticate, async (req, res) =>
       newStock: product.stock,
       updatedProduct: product
     });
-    
+
   } catch (error) {
     console.error('Stock update error:', error);
     return res.status(500).json({ 
