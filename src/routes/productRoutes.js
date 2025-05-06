@@ -228,6 +228,36 @@ router.put('/update-stock/:productId', authenticate, async (req, res) => {
     });
   }
 });
+
+// Add to your backend API (Node.js/Express)
+router.get('/api/products/verify-bulk', async (req, res) => {
+  try {
+    const { productIds } = req.body;
+    if (!productIds || !Array.isArray(productIds)) {
+      return res.status(400).json({ error: 'Invalid product IDs array' });
+    }
+
+    const existingProducts = await Product.find({
+      _id: { $in: productIds }
+    }).select('_id name stock');
+
+    const missingProducts = productIds.filter(id => 
+      !existingProducts.some(p => p._id.toString() === id)
+    );
+
+    res.json({
+      totalRequested: productIds.length,
+      found: existingProducts.length,
+      missing: missingProducts.length,
+      missingProductIds: missingProducts,
+      existingProducts
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 module.exports = router;
 
  
