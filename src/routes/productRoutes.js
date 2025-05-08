@@ -175,88 +175,35 @@ router.delete("/:id", authenticate, async (req, res) => {
   }
 });
 
-
-
-router.put('/update-stock/:productId', authenticate, async (req, res) => {
+// Example backend route for stock updates
+router.put('/update-stock/:productId', async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.productId)) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Invalid product ID format' 
-      });
-    }
-
-    const quantity = Number(req.body.quantity);
-    if (isNaN(quantity)) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Quantity must be a number' 
-      });
-    }
-
+    const { quantity } = req.body;
     const product = await Product.findById(req.params.productId);
+    
     if (!product) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Product not found' 
-      });
+      return res.status(404).json({ message: 'Product not found' });
     }
-
+    
+    // Validate stock won't go negative
     if (product.stock + quantity < 0) {
       return res.status(400).json({ 
-        success: false,
-        message: `Insufficient stock. Only ${product.stock} available` 
+        message: 'Insufficient stock available' 
       });
     }
-
+    
+    // Atomic update
     product.stock += quantity;
     await product.save();
-
-    return res.json({
+    
+    res.json({ 
       success: true,
-      message: 'Stock updated successfully',
-      newStock: product.stock,
-      updatedProduct: product
-    });
-
-  } catch (error) {
-    console.error('Stock update error:', error);
-    return res.status(500).json({ 
-      success: false,
-      message: 'Error updating stock',
-      error: error.message 
-    });
-  }
-});
-
-// Add to your backend API (Node.js/Express)
-router.get('/api/products/verify-bulk', async (req, res) => {
-  try {
-    const { productIds } = req.body;
-    if (!productIds || !Array.isArray(productIds)) {
-      return res.status(400).json({ error: 'Invalid product IDs array' });
-    }
-
-    const existingProducts = await Product.find({
-      _id: { $in: productIds }
-    }).select('_id name stock');
-
-    const missingProducts = productIds.filter(id => 
-      !existingProducts.some(p => p._id.toString() === id)
-    );
-
-    res.json({
-      totalRequested: productIds.length,
-      found: existingProducts.length,
-      missing: missingProducts.length,
-      missingProductIds: missingProducts,
-      existingProducts
+      newStock: product.stock 
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
-
 
 module.exports = router;
 
