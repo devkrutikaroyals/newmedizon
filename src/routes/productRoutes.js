@@ -205,6 +205,28 @@ router.put('/update-stock/:productId', async (req, res) => {
   }
 });
 
+router.put('/api/products/:id/decrease-stock', async (req, res) => {
+  const { id } = req.params;
+  const { quantity } = req.body;
+
+  // MongoDB किंवा जे काही DB आहे तिथून product शोधायचं
+  const product = await Product.findById(id);
+
+  if (!product) {
+    return res.status(404).json({ message: 'Product not found' });
+  }
+
+  if (product.stock < quantity) {
+    return res.status(400).json({ message: 'Not enough stock' });
+  }
+
+  product.stock -= quantity;
+  await product.save();
+
+  res.status(200).json({ message: 'Stock decreased successfully', stock: product.stock });
+});
+
+
 module.exports = router;
 
  
