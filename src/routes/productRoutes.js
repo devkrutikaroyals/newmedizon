@@ -175,55 +175,45 @@ router.delete("/:id", authenticate, async (req, res) => {
   }
 });
 
-// Example backend route for stock updates
-router.put('/update-stock/:productId', async (req, res) => {
+
+router.put('/update-stock/:id', async (req, res) => {
   try {
-    const { quantity } = req.body;
-    const product = await Product.findById(req.params.productId);
-    
+    const { id } = req.params; // id -> _id from MongoDB
+    const { quantity } = req.body; // quantity to decrease (should be negative or positive)
+
+    // ✅ Check if valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid product ID format' });
+    }
+
+    // ✅ Find Product
+    const product = await Product.findById(id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
-    
-    // Validate stock won't go negative
-    if (product.stock + quantity < 0) {
-      return res.status(400).json({ 
-        message: 'Insufficient stock available' 
-      });
+
+    // ✅ Validate stock won't become negative
+    const newStock = product.stock + quantity;
+    if (newStock < 0) {
+      return res.status(400).json({ message: 'Insufficient stock available' });
     }
-    
-    // Atomic update
-    product.stock += quantity;
+
+    // ✅ Update stock
+    product.stock = newStock;
     await product.save();
-    
-    res.json({ 
-      success: true,
-      newStock: product.stock 
+
+    res.status(200).json({ 
+      message: 'Stock updated successfully', 
+      product: {
+        _id: product._id,
+        name: product.name,
+        stock: product.stock
+      }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error updating stock:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
-});
-
-router.put('/api/products/:id/decrease-stock', async (req, res) => {
-  const { id } = req.params;
-  const { quantity } = req.body;
-
-  // MongoDB किंवा जे काही DB आहे तिथून product शोधायचं
-  const product = await Product.findById(id);
-
-  if (!product) {
-    return res.status(404).json({ message: 'Product not found' });
-  }
-
-  if (product.stock < quantity) {
-    return res.status(400).json({ message: 'Not enough stock' });
-  }
-
-  product.stock -= quantity;
-  await product.save();
-
-  res.status(200).json({ message: 'Stock decreased successfully', stock: product.stock });
 });
 
 
