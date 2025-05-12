@@ -8,6 +8,8 @@ const cloudinary = require("cloudinary").v2;
 const mongoose = require('mongoose');
 
 require("dotenv").config();
+const { getProductById } = require("../controllers/productController");
+
 
 
 const router = express.Router();
@@ -21,6 +23,7 @@ cloudinary.config({
 });
 
 
+router.get("/:id", getProductById);
 
 
 
