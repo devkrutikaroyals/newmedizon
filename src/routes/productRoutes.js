@@ -176,35 +176,37 @@ router.delete("/:id", authenticate, async (req, res) => {
 });
 
 
-
 // POST /product/place-order
 router.post("/place-order", async (req, res) => {
   const { items } = req.body;
 
+  // Validate items array
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: "Invalid or empty items array." });
   }
 
-  try {
-    // Start a session for atomic operations
-    const session = await mongoose.startSession();
-    session.startTransaction();
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
+  try {
     for (const item of items) {
       const productId = item.product_id?.trim();
       const quantity = item.quantity;
 
+      // Basic validations
       if (!productId || typeof quantity !== "number" || quantity <= 0) {
         await session.abortTransaction();
         return res.status(400).json({ message: "Invalid product data in order." });
       }
 
+      // Find product by MongoDB _id
       const product = await Product.findById(productId).session(session);
       if (!product) {
         await session.abortTransaction();
         return res.status(404).json({ message: `Product not found: ${productId}` });
       }
 
+      // Check stock availability
       if (product.stock < quantity) {
         await session.abortTransaction();
         return res.status(400).json({
@@ -217,15 +219,20 @@ router.post("/place-order", async (req, res) => {
       await product.save({ session });
     }
 
+    // All items processed successfully
     await session.commitTransaction();
     session.endSession();
 
     res.status(200).json({ message: "Order placed and stock updated successfully." });
+
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Order processing error:", error);
     res.status(500).json({ message: "Error processing order", error: error.message });
   }
 });
+
 
 
 module.exports = router;
