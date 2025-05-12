@@ -176,64 +176,163 @@ router.delete("/:id", authenticate, async (req, res) => {
 });
 
 
-// POST /product/place-order
 router.post("/place-order", async (req, res) => {
-  const { items } = req.body;
-
-  // Validate items array
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ message: "Invalid or empty items array." });
-  }
-
+  const { items, customerInfo, paymentInfo } = req.body;
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    for (const item of items) {
-      const productId = item.product_id?.trim();
-      const quantity = item.quantity;
+    // 1. Validate all items first
+    const stockValidation = await axios.post(
+      "https://newmedizon.onrender.com/api/products/validate-stock",
+      { items }
+    );
 
-      // Basic validations
-      if (!productId || typeof quantity !== "number" || quantity <= 0) {
-        await session.abortTransaction();
-        return res.status(400).json({ message: "Invalid product data in order." });
-      }
-
-      // Find product by MongoDB _id
-      const product = await Product.findById(productId).session(session);
-      if (!product) {
-        await session.abortTransaction();
-        return res.status(404).json({ message: `Product not found: ${productId}` });
-      }
-
-      // Check stock availability
-      if (product.stock < quantity) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${quantity}`,
-        });
-      }
-
-      // Deduct stock
-      product.stock -= quantity;
-      await product.save({ session });
+    if (!stockValidation.data.valid) {
+      return res.status(400).json({ 
+        message: "Stock validation failed",
+        results: stockValidation.data.results
+      });
     }
 
-    // All items processed successfully
-    await session.commitTransaction();
-    session.endSession();
+    // 2. Deduct stock for each item
+    const productUpdates = [];
+    const orderItems = [];
+    let totalAmount = 0;
 
-    res.status(200).json({ message: "Order placed and stock updated successfully." });
+    for (const item of items) {
+      const product = await Product.findById(item.product_id).session(session);
+      if (!product) {
+        throw new Error(`Product not found: ${item.product_id}`);
+      }
+
+      // Update stock
+      product.stock -= item.quantity;
+      await product.save({ session });
+
+      orderItems.push({
+        product_id: product._id.toString(), // Ensure we use string ID
+        product_name: product.name,
+        quantity: item.quantity,
+        unit_price: product.price,
+        subtotal: product.price * item.quantity
+      });
+
+      totalAmount += product.price * item.quantity;
+    }
+
+    // 3. Create order in Supabase
+    const orderData = {
+      email: customerInfo.email,
+      full_name: customerInfo.name,
+      contact_number: customerInfo.phone || '',
+      total_amount: totalAmount,
+      payment_method: paymentInfo?.method || 'unknown',
+      status: 'pending',
+      address_line1: customerInfo.address?.line1 || '',
+      landmark: customerInfo.address?.landmark || '',
+      pin_code: customerInfo.address?.postalCode || '',
+      items: orderItems,
+      created_at: new Date().toISOString()
+    };
+
+    const { data: supabaseOrder, error: supabaseError } = await supabase
+      .from('product_order')
+      .insert(orderData)
+      .select()
+      .single();
+
+    if (supabaseError) throw supabaseError;
+
+    // Commit transaction if everything succeeds
+    await session.commitTransaction();
+    
+    res.status(200).json({ 
+      message: "Order placed successfully",
+      orderId: supabaseOrder.id,
+      totalAmount 
+    });
 
   } catch (error) {
     await session.abortTransaction();
-    session.endSession();
     console.error("Order processing error:", error);
-    res.status(500).json({ message: "Error processing order", error: error.message });
+    res.status(500).json({ 
+      message: "Error processing order", 
+      error: error.message 
+    });
+  } finally {
+    session.endSession();
   }
 });
+ // Update product stock
+router.put("/:id/stock", async (req, res) => {
+  try {
+    const { quantity } = req.body;
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
 
+    // Ensure stock doesn't go negative
+    const newStock = product.stock + Number(quantity);
+    if (newStock < 0) {
+      return res.status(400).json({ 
+        message: `Insufficient stock. Current stock: ${product.stock}`
+      });
+    }
 
+    product.stock = newStock;
+    await product.save();
+
+    res.json({ 
+      success: true,
+      message: "Stock updated successfully",
+      product 
+    });
+  } catch (error) {
+    console.error("Error updating stock:", error);
+    res.status(500).json({ 
+      message: "Error updating stock", 
+      error: error.message 
+    });
+  }
+}); 
+// Add this to your backend routes
+router.post("/validate-stock", async (req, res) => {
+  const { items } = req.body;
+  
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ message: "Items must be an array" });
+  }
+  
+  try {
+    const results = await Promise.all(
+      items.map(async (item) => {
+        const product = await Product.findById(item.product_id);
+        if (!product) {
+          return { 
+            product_id: item.product_id,
+            valid: false,
+            message: "Product not found"
+          };
+        }
+        return {
+          product_id: item.product_id,
+          product_name: product.name,
+          requested: item.quantity,
+          available: product.stock,
+          valid: product.stock >= item.quantity
+        };
+      })
+    );
+    
+    const allValid = results.every(item => item.valid);
+    res.json({ valid: allValid, results });
+  } catch (error) {
+    res.status(500).json({ message: "Validation error", error: error.message });
+  }
+}); 
 
 module.exports = router;
 
