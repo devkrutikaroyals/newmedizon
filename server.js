@@ -1,5 +1,3 @@
-
-
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
@@ -8,6 +6,7 @@ const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
 const compression = require("compression");
 const morgan = require("morgan");
+const { createClient } = require('@supabase/supabase-js');
 
 // Import middleware and routes
 const errorHandler = require("./src/middleware/errorMiddleware");
@@ -21,16 +20,27 @@ const itemRoutes = require("./src/routes/itemRoutes");
 const orderRoutes = require("./src/routes/orderRoutes");
 const shipmentRoutes = require("./src/routes/shipmentRoutes");
 
-
 // Import models
 const Product = require("./src/models/Product");
 const Manufacturer = require("./src/models/Manufacturer");
 
 // Load environment variables
 dotenv.config();
+require("dotenv").config();
 
 // Initialize Express app
 const app = express();
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: false
+    }
+  }
+);
 
 // Middleware setup
 app.use(express.json({ limit: "10mb" }));
@@ -42,41 +52,92 @@ app.use(morgan("dev"));
 // Rate limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 100,
   message: { message: "Too many requests from this IP, please try again later." },
 });
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // Increase to 50 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 50,
   message: "Too many login attempts, please try again later.",
 });
 
+// Health check endpoint
 app.get("/", (req, res) => {
   res.send("Server is running");
 });
 
+// Apply rate limiting
 app.use("/api/", apiLimiter);
 app.use("/api/auth/login", authLimiter);
 
-// ✅ Database connection
+// Database connection
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/master-panel", {
-      serverSelectionTimeoutMS: 5000, // Fail after 5 seconds
-      maxPoolSize: 10, // Connection pool limit
+      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 10,
     });
-
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    console.log("💡 Check IP Whitelist in MongoDB Atlas: https://www.mongodb.com/docs/atlas/security-whitelist/");
     process.exit(1);
   }
 };
 connectDB();
 
-// 🌐 API Routes
+// Stock Sync Endpoint
+app.post("/api/sync-stock", async (req, res) => {
+  try {
+    // Verify request is from Supabase
+    const authHeader = req.headers['authorization'];
+    if (authHeader !== `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { data: changedProducts, error } = await supabase
+      .from('product_stock_changes')
+      .select('*')
+      .eq('synced', false);
+
+    if (error) throw error;
+
+    // Process each changed product
+    for (const product of changedProducts) {
+      try {
+        // Update MongoDB stock
+        const updatedProduct = await Product.findByIdAndUpdate(
+          product.product_id,
+          { $inc: { stock: -product.quantity_changed } },
+          { new: true }
+        );
+
+        if (updatedProduct) {
+          // Mark as synced in PostgreSQL
+          await supabase
+            .from('product_stock_changes')
+            .update({ synced: true, synced_at: new Date().toISOString() })
+            .eq('id', product.id);
+        }
+      } catch (err) {
+        console.error(`Failed to sync product ${product.product_id}:`, err);
+      }
+    }
+
+    return res.json({
+      success: true,
+      synced: changedProducts.length
+    });
+
+  } catch (err) {
+    console.error('Error in sync-stock:', err);
+    return res.status(500).json({
+      error: err.message
+    });
+  }
+});
+
+// API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/products", productRoutes);
@@ -87,8 +148,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/shipments", shipmentRoutes);
 app.use("/api/master-dashboard", masterDashboard);
 
-
-// 📊 Dashboard Counts
+// Dashboard Counts
 app.get("/api/total-products", async (req, res) => {
   try {
     const totalProducts = await Product.estimatedDocumentCount();
@@ -109,22 +169,20 @@ app.get("/api/total-manufacturers", async (req, res) => {
   }
 });
 
-// 🛠️ Global error handler
+// Error handling
 app.use(errorHandler);
-
-// 🚫 Handle 404 errors
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Endpoint not found" });
 });
 
-// 🚀 Start server
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔒 Environment: ${process.env.NODE_ENV || "development"}`);
 });
 
-// 🔄 Graceful shutdown
+// Graceful shutdown
 process.on("SIGINT", async () => {
   await mongoose.connection.close();
   console.log("🛑 MongoDB connection closed");
