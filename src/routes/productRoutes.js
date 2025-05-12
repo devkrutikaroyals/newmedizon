@@ -176,46 +176,63 @@ router.delete("/:id", authenticate, async (req, res) => {
 });
 
 
-router.put('/update-stock/:id', async (req, res) => {
+router.put('/:id/stock', async (req, res) => {
   try {
-    const { id } = req.params; // id -> _id from MongoDB
-    const { quantity } = req.body; // quantity to decrease (should be negative or positive)
+    const { id } = req.params;
+    const { quantity } = req.body;
 
-    // ✅ Check if valid MongoDB ObjectId
+    // Validate MongoDB ID format
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid product ID format' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid product ID format',
+        expectedFormat: 'MongoDB ObjectId (24-character hex string)'
+      });
     }
 
-    // ✅ Find Product
+    // Find and update product
     const product = await Product.findById(id);
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Product not found'
+      });
     }
 
-    // ✅ Validate stock won't become negative
-    const newStock = product.stock + quantity;
-    if (newStock < 0) {
-      return res.status(400).json({ message: 'Insufficient stock available' });
+    // Validate stock won't go negative
+    if (product.stock + quantity < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient stock available',
+        currentStock: product.stock
+      });
     }
 
-    // ✅ Update stock
-    product.stock = newStock;
-    await product.save();
+    // Atomic update
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
+      { $inc: { stock: quantity } },
+      { new: true }
+    );
 
-    res.status(200).json({ 
-      message: 'Stock updated successfully', 
+    res.status(200).json({
+      success: true,
+      message: 'Stock updated successfully',
       product: {
-        _id: product._id,
-        name: product.name,
-        stock: product.stock
+        _id: updatedProduct._id,
+        name: updatedProduct.name,
+        stock: updatedProduct.stock
       }
     });
+
   } catch (error) {
     console.error('Error updating stock:', error);
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error'
+    });
   }
 });
-
 
 module.exports = router;
 
