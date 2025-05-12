@@ -8,8 +8,6 @@ const cloudinary = require("cloudinary").v2;
 const mongoose = require('mongoose');
 
 require("dotenv").config();
-const { getProductById } = require("../controllers/productController");
-
 
 
 const router = express.Router();
@@ -23,7 +21,6 @@ cloudinary.config({
 });
 
 
-router.get("/:id", getProductById);
 
 
 
@@ -179,63 +176,57 @@ router.delete("/:id", authenticate, async (req, res) => {
 });
 
 
-router.put('/:id/stock', async (req, res) => {
+
+// POST /product/place-order
+router.post("/place-order", async (req, res) => {
+  const { items } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: "Invalid or empty items array." });
+  }
+
   try {
-    const { id } = req.params;
-    const { quantity } = req.body;
+    // Start a session for atomic operations
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Validate MongoDB ID format
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Invalid product ID format',
-        expectedFormat: 'MongoDB ObjectId (24-character hex string)'
-      });
-    }
+    for (const item of items) {
+      const productId = item.product_id?.trim();
+      const quantity = item.quantity;
 
-    // Find and update product
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Product not found'
-      });
-    }
-
-    // Validate stock won't go negative
-    if (product.stock + quantity < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Insufficient stock available',
-        currentStock: product.stock
-      });
-    }
-
-    // Atomic update
-    const updatedProduct = await Product.findByIdAndUpdate(
-      id,
-      { $inc: { stock: quantity } },
-      { new: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Stock updated successfully',
-      product: {
-        _id: updatedProduct._id,
-        name: updatedProduct.name,
-        stock: updatedProduct.stock
+      if (!productId || typeof quantity !== "number" || quantity <= 0) {
+        await session.abortTransaction();
+        return res.status(400).json({ message: "Invalid product data in order." });
       }
-    });
 
+      const product = await Product.findById(productId).session(session);
+      if (!product) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: `Product not found: ${productId}` });
+      }
+
+      if (product.stock < quantity) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${quantity}`,
+        });
+      }
+
+      // Deduct stock
+      product.stock -= quantity;
+      await product.save({ session });
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({ message: "Order placed and stock updated successfully." });
   } catch (error) {
-    console.error('Error updating stock:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Server error'
-    });
+    console.error("Order processing error:", error);
+    res.status(500).json({ message: "Error processing order", error: error.message });
   }
 });
+
 
 module.exports = router;
 
