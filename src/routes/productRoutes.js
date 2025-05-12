@@ -175,164 +175,48 @@ router.delete("/:id", authenticate, async (req, res) => {
   }
 });
 
-
-router.post("/place-order", async (req, res) => {
-  const { items, customerInfo, paymentInfo } = req.body;
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
+router.put('/update-stock/:id', async (req, res) => {
   try {
-    // 1. Validate all items first
-    const stockValidation = await axios.post(
-      "https://newmedizon.onrender.com/api/products/validate-stock",
-      { items }
-    );
-
-    if (!stockValidation.data.valid) {
-      return res.status(400).json({ 
-        message: "Stock validation failed",
-        results: stockValidation.data.results
-      });
-    }
-
-    // 2. Deduct stock for each item
-    const productUpdates = [];
-    const orderItems = [];
-    let totalAmount = 0;
-
-    for (const item of items) {
-      const product = await Product.findById(item.product_id).session(session);
-      if (!product) {
-        throw new Error(`Product not found: ${item.product_id}`);
-      }
-
-      // Update stock
-      product.stock -= item.quantity;
-      await product.save({ session });
-
-      orderItems.push({
-        product_id: product._id.toString(), // Ensure we use string ID
-        product_name: product.name,
-        quantity: item.quantity,
-        unit_price: product.price,
-        subtotal: product.price * item.quantity
-      });
-
-      totalAmount += product.price * item.quantity;
-    }
-
-    // 3. Create order in Supabase
-    const orderData = {
-      email: customerInfo.email,
-      full_name: customerInfo.name,
-      contact_number: customerInfo.phone || '',
-      total_amount: totalAmount,
-      payment_method: paymentInfo?.method || 'unknown',
-      status: 'pending',
-      address_line1: customerInfo.address?.line1 || '',
-      landmark: customerInfo.address?.landmark || '',
-      pin_code: customerInfo.address?.postalCode || '',
-      items: orderItems,
-      created_at: new Date().toISOString()
-    };
-
-    const { data: supabaseOrder, error: supabaseError } = await supabase
-      .from('product_order')
-      .insert(orderData)
-      .select()
-      .single();
-
-    if (supabaseError) throw supabaseError;
-
-    // Commit transaction if everything succeeds
-    await session.commitTransaction();
-    
-    res.status(200).json({ 
-      message: "Order placed successfully",
-      orderId: supabaseOrder.id,
-      totalAmount 
-    });
-
-  } catch (error) {
-    await session.abortTransaction();
-    console.error("Order processing error:", error);
-    res.status(500).json({ 
-      message: "Error processing order", 
-      error: error.message 
-    });
-  } finally {
-    session.endSession();
-  }
-});
- // Update product stock
-router.put("/:id/stock", async (req, res) => {
-  try {
+    const { id } = req.params;
     const { quantity } = req.body;
-    const product = await Product.findById(req.params.id);
-    
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid product ID' });
     }
 
-    // Ensure stock doesn't go negative
-    const newStock = product.stock + Number(quantity);
+    // Find and update product
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // Calculate new stock
+    const newStock = product.stock + quantity;
     if (newStock < 0) {
       return res.status(400).json({ 
-        message: `Insufficient stock. Current stock: ${product.stock}`
+        message: 'Insufficient stock',
+        currentStock: product.stock,
+        requestedChange: quantity
       });
     }
 
+    // Update stock
     product.stock = newStock;
     await product.save();
 
-    res.json({ 
+    res.json({
       success: true,
-      message: "Stock updated successfully",
-      product 
+      product: {
+        _id: product._id,
+        name: product.name,
+        stock: product.stock
+      }
     });
   } catch (error) {
-    console.error("Error updating stock:", error);
-    res.status(500).json({ 
-      message: "Error updating stock", 
-      error: error.message 
-    });
+    console.error('Stock update error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
-}); 
-// Add this to your backend routes
-router.post("/validate-stock", async (req, res) => {
-  const { items } = req.body;
-  
-  if (!Array.isArray(items)) {
-    return res.status(400).json({ message: "Items must be an array" });
-  }
-  
-  try {
-    const results = await Promise.all(
-      items.map(async (item) => {
-        const product = await Product.findById(item.product_id);
-        if (!product) {
-          return { 
-            product_id: item.product_id,
-            valid: false,
-            message: "Product not found"
-          };
-        }
-        return {
-          product_id: item.product_id,
-          product_name: product.name,
-          requested: item.quantity,
-          available: product.stock,
-          valid: product.stock >= item.quantity
-        };
-      })
-    );
-    
-    const allValid = results.every(item => item.valid);
-    res.json({ valid: allValid, results });
-  } catch (error) {
-    res.status(500).json({ message: "Validation error", error: error.message });
-  }
-}); 
+});
 
 module.exports = router;
 
