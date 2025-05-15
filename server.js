@@ -31,16 +31,7 @@ require("dotenv").config();
 // Initialize Express app
 const app = express();
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: false
-    }
-  }
-);
+
 
 // Middleware setup
 app.use(express.json({ limit: "10mb" }));
@@ -86,56 +77,6 @@ const connectDB = async () => {
 };
 connectDB();
 
-// Stock Sync Endpoint
-app.post("/api/sync-stock", async (req, res) => {
-  try {
-    // Verify request is from Supabase
-    const authHeader = req.headers['authorization'];
-    if (authHeader !== `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { data: changedProducts, error } = await supabase
-      .from('product_stock_changes')
-      .select('*')
-      .eq('synced', false);
-
-    if (error) throw error;
-
-    // Process each changed product
-    for (const product of changedProducts) {
-      try {
-        // Update MongoDB stock
-        const updatedProduct = await Product.findByIdAndUpdate(
-          product.product_id,
-          { $inc: { stock: -product.quantity_changed } },
-          { new: true }
-        );
-
-        if (updatedProduct) {
-          // Mark as synced in PostgreSQL
-          await supabase
-            .from('product_stock_changes')
-            .update({ synced: true, synced_at: new Date().toISOString() })
-            .eq('id', product.id);
-        }
-      } catch (err) {
-        console.error(`Failed to sync product ${product.product_id}:`, err);
-      }
-    }
-
-    return res.json({
-      success: true,
-      synced: changedProducts.length
-    });
-
-  } catch (err) {
-    console.error('Error in sync-stock:', err);
-    return res.status(500).json({
-      error: err.message
-    });
-  }
-});
 
 // API Routes
 app.use("/api/auth", authRoutes);

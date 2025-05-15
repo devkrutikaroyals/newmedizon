@@ -175,50 +175,42 @@ router.delete("/:id", authenticate, async (req, res) => {
   }
 });
 
-router.put('/update-stock/:id', async (req, res) => {
+
+
+  
+
+
+// In your products route (routes/products.js)
+router.put('/update-stock/:id', authenticate, async (req, res) => {
   try {
-    const { id } = req.params;
-    const { quantity } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid product ID' });
-    }
-
-    // Find and update product
-    const product = await Product.findById(id);
+    const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Calculate new stock
-    const newStock = product.stock + quantity;
-    if (newStock < 0) {
-      return res.status(400).json({ 
-        message: 'Insufficient stock',
-        currentStock: product.stock,
-        requestedChange: quantity
-      });
+    // Check if the manufacturer is updating their own product
+    if (req.user.role !== 'master' && product.manufacturer.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to update this product' });
     }
 
-    // Update stock
+    const newStock = product.stock + req.body.quantity;
+    if (newStock < 0) {
+      return res.status(400).json({ message: 'Insufficient stock' });
+    }
+
     product.stock = newStock;
     await product.save();
 
-    res.json({
+    res.json({ 
       success: true,
-      product: {
-        _id: product._id,
-        name: product.name,
-        stock: product.stock
-      }
+      message: 'Stock updated successfully',
+      product 
     });
   } catch (error) {
-    console.error('Stock update error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error updating stock:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 });
-
 module.exports = router;
 
  
-  
