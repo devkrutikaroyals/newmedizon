@@ -26,7 +26,12 @@ const productSchema = new mongoose.Schema({
   imageUrl: String,
   videoUrl: String, // ✅ New
   company: String,  // ✅ New
-  size: String,     // ✅ New
+  size: String, 
+  returnPolicy: {
+    type: String,
+    enum: ['yes', 'no'],
+    default: 'no'
+  },    // ✅ New
   
   manufacturer: { 
     type: mongoose.Schema.Types.ObjectId,

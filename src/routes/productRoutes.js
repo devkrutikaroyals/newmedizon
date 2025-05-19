@@ -92,6 +92,7 @@ router.post("/", authenticate, upload.fields([{ name: "imageFile" }, { name: "vi
       location: req.body.location,
       company: req.body.company,
       size: req.body.size,
+      returnPolicy: req.body.returnPolicy,
     };
 
     if (req.user.role !== "master") {
