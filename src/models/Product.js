@@ -29,8 +29,7 @@ const productSchema = new mongoose.Schema({
   size: String, 
   returnPolicy: {
     type: String,
-    enum: ['yes', 'no'],
-    default: 'no'
+  
   },    // ✅ New
   
   manufacturer: { 
