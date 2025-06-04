@@ -1,119 +1,44 @@
-// const express = require("express");
-// const { register, loginUser , authorizeManufacturer, fetchPendingManufacturers } = require("../controllers/authController");
-
-// const router = express.Router();
-
-// // Route to register user
-// router.post("/register", register);
-
-// // Route to login user
-// router.post("/login", loginUser ); // Ensure this route is defined
-
-// // Route to authorize manufacturer (admin only)
-// router.post("/authorize", authorizeManufacturer);
-
-// // Route to fetch pending manufacturers
-// router.get("/pending-manufacturers", fetchPendingManufacturers);
-
-// module.exports = router;
-
-// const express = require("express");
-// const {
-//   register,
-//   loginUser,
-//   authorizeManufacturer,
-//   fetchPendingManufacturers,
-//   updatePassword,
-
-  
-// } = require("../controllers/authController");
-
-// const router = express.Router();
-
-// // Route to register user
-// router.post("/register", register);
-
-// // Route to login user
-// router.post("/login", loginUser);
-
-// // Route to authorize manufacturer (admin only)
-// router.post("/authorize", authorizeManufacturer);
-
-// // Route to fetch pending manufacturers
-// router.get("/pending-manufacturers", fetchPendingManufacturers);
-
-// // Route to update password
-// router.put("/update-password", updatePassword); // Add the new route
-
-
-
-// module.exports = router;
-
-
-
-// const express = require("express");
-// const {
-//   register,
-//   loginUser,
-//   authorizeManufacturer,
-//   fetchPendingManufacturers,
-//   updatePassword,
-//   declineManufacturer, // Add the new function
-// } = require("../controllers/authController");
-
-// const router = express.Router();
-
-// // Route to register user
-// router.post("/register", register);
-
-// // Route to login user
-// router.post("/login", loginUser);
-
-// // Route to authorize manufacturer (admin only)
-// router.post("/authorize", authorizeManufacturer);
-
-// // Route to fetch pending manufacturers
-// router.get("/pending-manufacturers", fetchPendingManufacturers);
-
-// // Route to update password
-// router.put("/update-password", updatePassword);
-
-// // Route to decline manufacturer
-// router.post("/decline-manufacturer", declineManufacturer); // Add the new route
-
-// module.exports = router;
 const express = require("express");
 const router = express.Router();
 
 const {
   register,
   loginUser,
-  approveManufacturer,
   fetchPendingManufacturers,
-  updatePassword,
+  authorizeManufacturer,
   declineManufacturer,
-  authorizeManufacturer, // ✅ Ensure this function exists in authController.js
+  updatePassword,
+  approveManufacturer
 } = require("../controllers/authController");
-
-// Route to register user
+const supabase = require('../config/supabaseClient');  
 router.post("/register", register);
-
-// Route to login user
-router.post("/login", loginUser);
-
-// Route to authorize manufacturer (admin only)
-router.post("/authorize", authorizeManufacturer); // 🔴 If this is undefined, remove it!
-
-// Route to fetch pending manufacturers
+router.post("/login", loginUser)
 router.get("/pending-manufacturers", fetchPendingManufacturers);
-
-// Route to update password
-router.put("/update-password", updatePassword);
-
-// Route to decline manufacturer
+router.post("/authorize", authorizeManufacturer);
 router.post("/decline-manufacturer", declineManufacturer);
+router.put("/update-password", updatePassword);
+router.post("/approveMf",approveManufacturer)
+router.get('/me', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) return res.status(401).json({ error: 'No authorization header' });
 
-// Route to approve manufacturer (via email link)
-router.get("/approve-manufacturer", approveManufacturer);
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+
+    const { data, error } = await supabase.auth.getUser(token);
+
+    if (error || !data.user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    return res.json(data.user);
+  } catch (error) {
+    console.error('Error in /api/auth/me:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 
 module.exports = router;
